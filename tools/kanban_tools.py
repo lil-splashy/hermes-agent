@@ -22,7 +22,7 @@ from hermes_cli.config import cfg_get, load_config
 from tools.kanban_tools_schemas import (
     KANBAN_ATTACH_SCHEMA,
     KANBAN_ATTACH_URL_SCHEMA, KANBAN_ATTACHMENTS_SCHEMA, KANBAN_BLOCK_SCHEMA, KANBAN_COMMENT_SCHEMA,
-    KANBAN_COMPLETE_SCHEMA, KANBAN_CREATE_SCHEMA, KANBAN_HEARTBEAT_SCHEMA, KANBAN_LINK_SCHEMA,
+    KANBAN_COMPLETE_SCHEMA, KANBAN_CREATE_SCHEMA, KANBAN_EDIT_SCHEMA, KANBAN_HEARTBEAT_SCHEMA, KANBAN_LINK_SCHEMA,
     KANBAN_LIST_SCHEMA, KANBAN_REQUEST_CHANGES_SCHEMA, KANBAN_REQUEST_REVIEW_SCHEMA,
     KANBAN_SCHEDULE_SCHEMA, KANBAN_SHOW_SCHEMA, KANBAN_UNBLOCK_SCHEMA)
 
@@ -722,6 +722,23 @@ def _handle_list(args: dict, **kw) -> str:
             "promoted": promoted})
 
 
+@_kanban_handler("kanban_edit")
+def _handle_edit(args: dict, **kw) -> str:
+    _require_orchestrator_tool("kanban_edit")
+    tid = args.get("task_id")
+    _check(isinstance(tid, str) and bool(tid), "task_id is required")
+    fields = {name: args[name] for name in ("title", "body", "priority") if name in args}
+    _check(fields, "provide title, body, or priority")
+    _check(all(isinstance(value, str) for name, value in fields.items() if name != "priority"),
+           "title and body must be strings")
+    _check("priority" not in fields or type(fields["priority"]) is int,
+           "priority must be an integer")
+    with _board(args.get("board")) as (kb, conn):
+        _check(kb.edit_task(conn, tid, board=args.get("board"), **fields), f"task {tid} not found")
+        task = kb.get_task(conn, tid)
+        return _ok(task_id=tid, title=task.title, body=task.body,
+                   priority=task.priority)
+
 @_kanban_handler("kanban_complete")
 def _handle_complete(args: dict, **kw) -> str:
     """Mark the current task done with a structured handoff."""
@@ -1290,11 +1307,12 @@ def _handle_link(args: dict, **kw) -> str:
 
 # --- Registration (order preserved: it is the order tools appear in the schema) ---
 
-# kanban_list / kanban_unblock route the board and are hidden from task workers.
-_ORCHESTRATOR_TOOLS = frozenset({"kanban_list", "kanban_unblock"})
+# Board-routing/editing tools are hidden from task workers.
+_ORCHESTRATOR_TOOLS = frozenset({"kanban_list", "kanban_edit", "kanban_unblock"})
 _TOOLS = (
     ("kanban_show", KANBAN_SHOW_SCHEMA, _handle_show, "📋"),
     ("kanban_list", KANBAN_LIST_SCHEMA, _handle_list, "📋"),
+    ("kanban_edit", KANBAN_EDIT_SCHEMA, _handle_edit, "✏️"),
     ("kanban_complete", KANBAN_COMPLETE_SCHEMA, _handle_complete, "✔"),
     ("kanban_block", KANBAN_BLOCK_SCHEMA, _handle_block, "⏸"),
     ("kanban_schedule", KANBAN_SCHEDULE_SCHEMA, _handle_schedule, "⏰"),

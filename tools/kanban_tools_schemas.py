@@ -86,6 +86,18 @@ KANBAN_LIST_SCHEMA = _schema(
     [],
 )
 
+KANBAN_EDIT_SCHEMA = _schema(
+    "kanban_edit",
+    "Edit an existing task's title, body, or priority. Orchestrator-only; use to correct a stale task specification, not to complete it. Returns persisted fields for readback.",
+    {
+        "task_id": _prop("string", "Task id to edit (required)."),
+        "title": _prop("string", "Replacement title, if changing."),
+        "body": _prop("string", "Replacement body, if changing."),
+        "priority": _prop("integer", "Replacement priority, if changing."),
+    },
+    ["task_id"],
+)
+
 KANBAN_COMPLETE_SCHEMA = _schema(
     "kanban_complete",
     (

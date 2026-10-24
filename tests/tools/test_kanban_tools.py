@@ -141,6 +141,20 @@ def test_kanban_task_id_descriptions_state_the_non_worker_case():
     assert "kanban_show" in seen
 
 
+def test_edit_orchestrator_only_and_readback(monkeypatch, worker_env):
+    from tools import kanban_tools as kt
+
+    payload = {"task_id": worker_env, "body": "Five verified PRs only"}
+    assert json.loads(kt._handle_edit(payload)).get("error")
+    monkeypatch.delenv("HERMES_KANBAN_TASK")
+    assert json.loads(kt._handle_edit({"task_id": worker_env, "priority": True})).get("error")
+    assert json.loads(kt._handle_edit({"task_id": worker_env})).get("error")
+    edited = json.loads(kt._handle_edit(payload))
+    assert edited["ok"] is True
+    assert edited["body"] == payload["body"]
+    assert json.loads(kt._handle_show({"task_id": worker_env}))["task"]["body"] == payload["body"]
+
+
 def test_list_filters_tasks(monkeypatch, worker_env):
     """kanban_list gives orchestrators filtered board discovery."""
     monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
